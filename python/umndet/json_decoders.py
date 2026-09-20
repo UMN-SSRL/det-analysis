@@ -81,15 +81,15 @@ def decode_x123_sci():
         json.dump(json_out, f, indent=1)
 
 
-def decode_hafx_debug_hist():
-    p = argparse.ArgumentParser(description="Decode HaFX debug histograms to JSON")
+def decode_impress_debug_hist():
+    p = argparse.ArgumentParser(description="Decode IMPRESS debug histograms to JSON")
     p.add_argument("files", nargs="+", help="debug histogram files to decode to JSON")
     p.add_argument("output_fn", help="output file name to write JSON")
     args = p.parse_args()
 
     data = []
     for fn in args.files:
-        data += hp.read_hafx_debug(fn, gzip.open)
+        data += hp.read_bridgeport_debug(fn, gzip.open)
 
     decoded = [d.decode() for d in data]
     if any(d["type"] != "histogram" for d in decoded):
@@ -103,7 +103,7 @@ def decode_hafx_debug_hist():
         json.dump(out, f, indent=1)
 
 
-def decode_hafx_sci():
+def decode_impress_sci():
     """
     Decode science data from binary structures to JSON.
     Assumes:
@@ -113,21 +113,21 @@ def decode_hafx_sci():
     Note that the timestamps correspond to the "left" edges of the
     times where counts are recorded.
     """
-    p = argparse.ArgumentParser(description="Decode HaFX science files to JSON")
+    p = argparse.ArgumentParser(description="Decode IMPRESS science files to JSON")
     p.add_argument("files", nargs="+", help="files to decode to JSON")
     p.add_argument("output_fn", help="output file name to write JSON")
     args = p.parse_args()
 
-    hafx_data = []
+    impress_data = []
     time_deltas = []
     for fn in args.files:
-        hafx_data += (cur_data := hp.read_hafx_sci(fn, gzip.open))
+        impress_data += (cur_data := hp.read_impress_sci(fn, gzip.open))
         # Give as many timedeltas and data formats
         # as there are data points per file,
         # so that we can easily align them later
         time_deltas += [1 / 32] * len(cur_data)
 
-    jsonified = [hd.to_json() for hd in hafx_data]
+    jsonified = [hd.to_json() for hd in impress_data]
 
     # Default value: start of UNIX epoch
     utc_time = dt.datetime.fromtimestamp(0, dt.UTC)

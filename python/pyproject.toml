@@ -26,6 +26,6 @@ all = [
 [project.scripts]
 # Decoder helper scripts
 decode-impress-health = "umndet.ground.json_decoders:decode_health"
-decode-impress-hafx = "umndet.ground.json_decoders:decode_hafx_sci"
+decode-impress-science = "umndet.ground.json_decoders:decode_impress_sci"
 decode-x123-science = "umndet.ground.json_decoders:decode_x123_sci"
 decode-exact-science = "umndet.ground.json_decoders:decode_exact_sci"

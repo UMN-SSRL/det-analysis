@@ -53,7 +53,7 @@ class NominalImpress(ctypes.Structure):
         }
 
 
-class HafxHealth(ctypes.Structure):
+class BridgeportHealth(ctypes.Structure):
     # no struct padding
     _pack_ = 1
     _fields_ = [
@@ -139,10 +139,10 @@ class DetectorHealth(ctypes.Structure):
     _pack_ = 1
     _fields_ = [
         ("timestamp", ctypes.c_uint32),
-        ("c1", HafxHealth),
-        ("m1", HafxHealth),
-        ("m5", HafxHealth),
-        ("x1", HafxHealth),
+        ("c1", BridgeportHealth),
+        ("m1", BridgeportHealth),
+        ("m5", BridgeportHealth),
+        ("x1", BridgeportHealth),
         ("x123", X123Health),
     ]
 
@@ -212,7 +212,7 @@ class X123Debug:
         return self.bytes[:first_null].decode("utf-8")
 
 
-class HafxDebug:
+class BridgeportDebug:
     # * Order matters here (we are decoding an enum)
     # * Data sizes are taken from MDS documentation
     #   https://www.bridgeportinstruments.com/products/software/wxMCA_doc/documentation/english/mds/mca3k/introduction.html
@@ -237,7 +237,7 @@ class HafxDebug:
 
     def decode(self) -> dict[str, object]:
         try:
-            type_, unpack_str = HafxDebug.TYPE_DECODE_MAP[self.type]
+            type_, unpack_str = BridgeportDebug.TYPE_DECODE_MAP[self.type]
         except IndexError as e:
             raise ValueError(f"{self.type} unknown type index") from e
 

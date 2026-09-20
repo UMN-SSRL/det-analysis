@@ -50,7 +50,7 @@ def read_det_health(fn: str, open_func: Callable) -> list[ds.DetectorHealth]:
     return read_binary(fn, ds.DetectorHealth, open_func)
 
 
-def read_hafx_sci(fn: str, open_func: Callable) -> list[ds.NominalImpress]:
+def read_impress_sci(fn: str, open_func: Callable) -> list[ds.NominalImpress]:
     return read_binary(fn, ds.NominalImpress, open_func)
 
 
@@ -77,10 +77,10 @@ def read_x123_debug(fn: str, open_func: Callable) -> list[ds.X123Debug]:
     return generic_read_binary(fn, open_func, read_elt)
 
 
-def read_hafx_debug(fn: str, open_func: Callable) -> list[ds.HafxDebug]:
+def read_bridgeport_debug(fn: str, open_func: Callable) -> list[ds.BridgeportDebug]:
     def read_elt(f: BytesIO):
         (type_,) = struct.unpack("<B", f.read(1))
-        name, packing = ds.HafxDebug.TYPE_DECODE_MAP[type_]
+        name, packing = ds.BridgeportDebug.TYPE_DECODE_MAP[type_]
         try:
             sz = struct.calcsize(packing)
         except TypeError:
@@ -97,7 +97,7 @@ def read_hafx_debug(fn: str, open_func: Callable) -> list[ds.HafxDebug]:
                 sz = 2 + (num_evts * 12) + 4
 
         bytes_ = f.read(sz)
-        return ds.HafxDebug(type_, bytes_)
+        return ds.BridgeportDebug(type_, bytes_)
 
     return generic_read_binary(fn, open_func, read_elt)
 
