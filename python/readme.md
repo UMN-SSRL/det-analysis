@@ -3,25 +3,11 @@
 ## For setup, see `docs/python-setup.md`
 
 ## How to use
-### Import what you want in Python, e.g.: `from umndet.common import impress_exact_structs as ies`
+### Import what you want in Python, e.g.: `from umndet import data_structs as ds`
 
-## Common code between flight/ground (`umn_detector/common`)
-Code containing ways to parse binary data to Python (via `ctypes` and `struct`).
-
-## Ground code
-Code that runs on the ground once we get the data.
-Used to decode packets into JSON for parsing later on.
-
-## Tools
-Useful tools--simulate data and other things.
-
-## Rebinner (used in-flight)
-Rebins the science data from IMPRESS into smaller files.
-
-Scripts are defined in `pyproject.toml`. Example:
-### Rebin data
-```bash
-impress-rebinner time+energy data/file-ident-*
-```
-Will rebin the files given along time and energy axes.
-
+## Summary of code portions
+- `data_structs`: structures mirroring flight data
+    - Can parse into JSON if desired
+- `helpers`: functions to load in binary files into structs
+- `json_decoders`: tools to parse binary files into .JSON files
+- `plotting`: carefully-crafted plotting functions for science data
