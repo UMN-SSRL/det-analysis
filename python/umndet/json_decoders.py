@@ -1,12 +1,13 @@
 import argparse
-import datetime as dt
-import json
-import gzip
-import numpy as np
 import datetime
-from umndet.common import helpers as hp
-from umndet.common import impress_exact_structs as ies
-import umndet.common.constants as umncon
+import datetime as dt
+import gzip
+import json
+
+import numpy as np
+
+from . import helpers as hp
+from . import data_structs as ies
 
 
 # Monkeypatch JSON to output only 2 decmials
@@ -100,46 +101,6 @@ def decode_hafx_debug_hist():
         json.dump(out, f, indent=1)
 
 
-def get_proper_timedelta(file_name):
-    """
-    Rebinned science data will have different time deltas between events.
-    This is because if we sum along the time axis, the counts in the
-    spectrogram can be considered to be bounded by wider time edges.
-
-    Make this a function so that we can update it if we change the rebinning scheme down the line.
-    """
-    # File name format is: IDENT_DATE_#.extension
-    identifier, date_str, _ = file_name.split("_")
-    date = dt.datetime.strptime(date_str, umncon.DATE_FMT)
-
-    slice_width = dt.timedelta(seconds=1 / 32)
-
-    if "time" in identifier:
-        # Add more revisions as appropriate
-        if date >= umncon.FIRST_REVISION:
-            return umncon.FIRST_NUM_TIMES_REBIN * slice_width
-
-    return slice_width
-
-
-def get_data_format(fn: str) -> str:
-    """
-    Depending on the file naming convention used by the rebinner,
-    we can either be dealing with:
-        - "raw" aka full-resolution data
-        - rebinned across time
-        - rebinned across energy
-        - rebinneda cross time and energy
-    """
-    possibilities = ("time+energy", "time", "energy")
-    for p in possibilities:
-        if fn.startswith(p):
-            return p
-
-    # No rebinning has happened; return something useful
-    return "full_resolution"
-
-
 def decode_hafx_sci():
     """
     Decode science data from binary structures to JSON.
@@ -157,14 +118,12 @@ def decode_hafx_sci():
 
     hafx_data = []
     time_deltas = []
-    data_type = []
     for fn in args.files:
         hafx_data += (cur_data := hp.read_hafx_sci(fn, gzip.open))
         # Give as many timedeltas and data formats
         # as there are data points per file,
         # so that we can easily align them later
-        time_deltas += [get_proper_timedelta(fn)] * len(cur_data)
-        data_type += [get_data_format(fn)] * len(cur_data)
+        time_deltas += [1 / 32] * len(cur_data)
 
     jsonified = [hd.to_json() for hd in hafx_data]
 
@@ -181,8 +140,6 @@ def decode_hafx_sci():
             "value": (utc_time + (frame_num % 32) * step).isoformat() + "Z",
             "unit": "N/A",
         }
-        type_ = data_type[i]
-        json_dat["datatype"] = {"value": type_, "unit": "N/A"}
 
     jsonified.sort(key=lambda e: e["timestamp"]["value"])
     collapsed = collapse_json(jsonified)
@@ -190,9 +147,9 @@ def decode_hafx_sci():
         json.dump(collapsed, f)
 
 
-def collapse_json(data: list[dict[str, object]]):
+def collapse_json(data: list[dict[str, object]]) -> dict[str, object]:
     collapse_keys = tuple(data[0].keys())
-    ret = dict()
+    ret = {}
 
     for datum in data:
         for k in collapse_keys:
@@ -208,10 +165,10 @@ def collapse_json(data: list[dict[str, object]]):
     return ret
 
 
-def collapse_health(dat: list[dict[str, object]]) -> list[dict[str, object]]:
-    detectors = ("c1", "m1", "m5", "x1", "x123")
-    ret = dict()
+def collapse_health(dat: list[dict[str, object]]) -> dict[str, object]:
+    ret = {}
 
+    detectors = ("c1", "m1", "m5", "x1", "x123")
     for detector in detectors:
         ret[detector] = collapse_json([d[detector] for d in dat])
 
@@ -248,13 +205,13 @@ def decode_exact_sci():
         f.write(bytes_)
 
 
-def jsonify_exact_buffer(buffer: dict[str, object]) -> dict[str, object]:
+def jsonify_exact_buffer(buffer: dict[str, object]) -> list[dict[str, object]]:
     """Take a list of EXACT NRL buffers which have been read into
     a dict format of {'timestamp': timestamp, 'buffers': [buffers]}
     and "jsonify" them into a list of JSON objects
     represented as dictionaries.
     """
-    all_events, rel_times = list(), list()
+    all_events, rel_times = [], []
     last_pps_rel_time = None
     for i, e in enumerate(buffer["events"]):
         all_events.append(e)

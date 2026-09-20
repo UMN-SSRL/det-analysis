@@ -1,14 +1,14 @@
 import datetime
-import numpy as np
-import matplotlib.pyplot as plt
 
-from umndet.common import impress_exact_structs as ies
-from umndet.common import helpers
-from umndet.common.constants import BRIDGEPORT_EDGES
+import matplotlib.pyplot as plt
+import numpy as np
+
+from . import helpers
+from . import impress_exact_structs as ies
 
 
 def plot_raw_time_slice_spectrogram(
-    data: list[ies.NominalHafx], fig=None, ax=None, adc_bins=BRIDGEPORT_EDGES
+    data: list[ies.NominalHafx], adc_bins: list[int], fig=None, ax=None
 ):
     counts_spectrogram = np.array([hd.histogram for hd in data])
 

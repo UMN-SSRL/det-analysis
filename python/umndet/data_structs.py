@@ -1,7 +1,7 @@
 import base64
-from io import BytesIO
 import ctypes
 import struct
+from io import BytesIO
 
 
 # Convert deg Celsius to Kelvin
