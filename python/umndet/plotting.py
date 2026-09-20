@@ -3,12 +3,11 @@ import datetime
 import matplotlib.pyplot as plt
 import numpy as np
 
-from . import helpers
-from . import impress_exact_structs as ies
+from . import data_structs as ies
 
 
 def plot_raw_time_slice_spectrogram(
-    data: list[ies.NominalHafx], adc_bins: list[int], fig=None, ax=None
+    data: list[ies.NominalImpress], adc_bins: list[int], fig=None, ax=None
 ):
     counts_spectrogram = np.array([hd.histogram for hd in data])
 
@@ -31,11 +30,10 @@ def plot_raw_time_slice_spectrogram(
     fig = fig or plt.gcf()
     ax = ax or plt.gca()
 
-    # Convert bin map we send to the Bridgeport
-    # into equivalent normal Bridgeport bins (4096 of em)
-    reversed_bins = helpers.reverse_bridgeport_mapping(adc_bins)
-
-    pcm = ax.pcolormesh(times, reversed_bins, counts_spectrogram.T, cmap="plasma")
+    # Bridgeport natively maps to 124 customizable bins;
+    # c.f. IMPRESS firwmare spec on Google Drive
+    bins = np.arange(124)
+    pcm = ax.pcolormesh(np.array(times), bins, counts_spectrogram.T, cmap="plasma")
     ax.set(
         xlabel="Time (UTC)",
         ylabel="Normal Bridgeport ADC bin",

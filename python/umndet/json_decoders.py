@@ -3,21 +3,23 @@ import datetime
 import datetime as dt
 import gzip
 import json
+import json.encoder
+from typing import cast
 
 import numpy as np
 
+from . import data_structs as ds
 from . import helpers as hp
-from . import data_structs as ies
 
 
 # Monkeypatch JSON to output only 2 decmials
 # https://stackoverflow.com/a/69056325
 class RoundingFloat(float):
-    __repr__ = staticmethod(lambda x: format(x, ".2f"))
+    __repr__ = staticmethod(lambda x: format(x, ".2f"))  # pyright: ignore[reportAssignmentType]
 
 
-json.encoder.c_make_encoder = None
-json.encoder.float = RoundingFloat
+json.encoder.c_make_encoder = None  # pyright: ignore[reportAttributeAccessIssue]
+json.encoder.float = RoundingFloat  # pyright: ignore[reportAttributeAccessIssue]
 
 
 def decode_health():
@@ -165,7 +167,7 @@ def collapse_json(data: list[dict[str, object]]) -> dict[str, object]:
     return ret
 
 
-def collapse_health(dat: list[dict[str, object]]) -> dict[str, object]:
+def collapse_health(dat: list[dict[str, dict | object]]) -> dict[str, list | dict]:
     ret = {}
 
     detectors = ("c1", "m1", "m5", "x1", "x123")
@@ -187,7 +189,7 @@ def decode_exact_sci():
     p.add_argument("output_fn", help="output file name to write JSON")
     args = p.parse_args()
 
-    jsonified = list()
+    jsonified = []
     for fn in args.files:
         cur_buffers = hp.read_nrl_list(fn, gzip.open)
         for buffer in cur_buffers:
@@ -205,7 +207,7 @@ def decode_exact_sci():
         f.write(bytes_)
 
 
-def jsonify_exact_buffer(buffer: dict[str, object]) -> list[dict[str, object]]:
+def jsonify_exact_buffer(buffer: dict[str, int | list[ds.NrlDataPoint]]) -> list[dict[str, object]]:
     """Take a list of EXACT NRL buffers which have been read into
     a dict format of {'timestamp': timestamp, 'buffers': [buffers]}
     and "jsonify" them into a list of JSON objects
@@ -213,7 +215,7 @@ def jsonify_exact_buffer(buffer: dict[str, object]) -> list[dict[str, object]]:
     """
     all_events, rel_times = [], []
     last_pps_rel_time = None
-    for i, e in enumerate(buffer["events"]):
+    for e in cast(list[ds.NrlDataPoint], buffer["events"]):
         all_events.append(e)
         rel_times.append(e.relative_timestamp)
 
@@ -226,7 +228,7 @@ def jsonify_exact_buffer(buffer: dict[str, object]) -> list[dict[str, object]]:
     # The last PPS event is assumed to be aligned with the
     # absolute time saved immediately after the buffer readout.
     # So, we save the values for calibration in the next step.
-    time_after = buffer["unix_time"]
+    time_after = cast(int, buffer["unix_time"])
     anchor = datetime.datetime.fromtimestamp(time_after, datetime.UTC)
 
     all_events = [events.to_json() for events in all_events]
@@ -237,7 +239,7 @@ def jsonify_exact_buffer(buffer: dict[str, object]) -> list[dict[str, object]]:
         del evt["relative_timestamp"]
 
         # Datetime can't format nanoseconds natively, so add it manually after
-        ns_delta = (rel_time - last_pps_rel_time) * ies.FullSizeNrlDataPoint.NS_PER_TICK
+        ns_delta = (rel_time - last_pps_rel_time) * ds.NrlDataPoint.NS_PER_TICK
         delta = datetime.timedelta(microseconds=int(ns_delta / 1e3))
 
         abs_time = (anchor + delta).strftime("%Y-%j-%H-%M-%S")

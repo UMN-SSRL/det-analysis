@@ -10,10 +10,10 @@ def c_to_k(t):
 
 
 NUM_HG_BINS = 123
-HafxHistogramArray = NUM_HG_BINS * ctypes.c_uint32
+ImpressHistogramArray = NUM_HG_BINS * ctypes.c_uint32
 
 
-class NominalHafx(ctypes.Structure):
+class NominalImpress(ctypes.Structure):
     # do not pad the struct
     _pack_ = 1
     _fields_ = [
@@ -23,7 +23,7 @@ class NominalHafx(ctypes.Structure):
         ("num_triggers", ctypes.c_uint32),
         ("dead_time", ctypes.c_uint32),
         ("anode_current", ctypes.c_uint32),
-        ("histogram", HafxHistogramArray),
+        ("histogram", ImpressHistogramArray),
         ("time_anchor", ctypes.c_uint32),
         ("missed_pps", ctypes.c_bool),
     ]
@@ -49,7 +49,7 @@ class NominalHafx(ctypes.Structure):
                 "value": converters.get(k, lambda x: x)(getattr(self, k)),
                 "unit": units.get(k, "N/A"),
             }
-            for k, _ in self._fields_
+            for k, *_ in self._fields_
         }
 
 
@@ -94,7 +94,7 @@ class HafxHealth(ctypes.Structure):
                 "value": converters.get(k, lambda x: x)(getattr(self, k)),
                 "unit": units[k],
             }
-            for k, _ in self._fields_
+            for k, *_ in self._fields_
         }
 
 
@@ -131,7 +131,7 @@ class X123Health(ctypes.Structure):
                 "value": converters.get(k, lambda x: x)(getattr(self, k)),
                 "unit": units[k],
             }
-            for k, _ in self._fields_
+            for k, *_ in self._fields_
         }
 
 
@@ -148,7 +148,7 @@ class DetectorHealth(ctypes.Structure):
 
     def to_json(self):
         return {"timestamp": self.timestamp} | {
-            k: getattr(self, k).to_json() for (k, _) in self._fields_[1:]
+            k: getattr(self, k).to_json() for (k, *_) in self._fields_[1:]
         }
 
 
@@ -216,48 +216,52 @@ class HafxDebug:
     # * Order matters here (we are decoding an enum)
     # * Data sizes are taken from MDS documentation
     #   https://www.bridgeportinstruments.com/products/software/wxMCA_doc/documentation/english/mds/mca3k/introduction.html
-    TYPE_DECODE_MAP = [
+    TYPE_DECODE_MAP = (
         ("arm_ctrl", "<64f"),
         ("arm_cal", "<64f"),
         ("arm_status", "<7f"),
+        ("arm_version", ""),
         ("fpga_ctrl", "<16H"),
+        ("fpga_histogram", "<4096L"),
+        ("fpga_list_mode", "<1024H"),
+        # The NRL list mode: a funny name, and variable size
+        ("fpga_lm_nrl1", NotImplemented),
         ("fpga_oscilloscope_trace", "<1024H"),
         ("fpga_statistics", "<16L"),
         ("fpga_weights", "<1024H"),
-        ("histogram", "<4096L"),
-        ("listmode", "<1024H"),
-        # The NRL list mode data is variable-size,
-        # so we need to handle it as a special case
-        ("nrl_list_full_size", NotImplemented),
-    ]
+    )
 
     def __init__(self, debug_type: int, debug_bytes: bytes):
         self.type = debug_type
         self.bytes = debug_bytes
 
     def decode(self) -> dict[str, object]:
-        type_, unpack_str = HafxDebug.TYPE_DECODE_MAP[self.type]
-        if type_ != "nrl_list_full_size":
+        try:
+            type_, unpack_str = HafxDebug.TYPE_DECODE_MAP[self.type]
+        except IndexError as e:
+            raise ValueError(f"{self.type} unknown type index") from e
+
+        if unpack_str != NotImplemented:
             return {
                 "type": type_,
                 "registers": list(struct.unpack(unpack_str, self.bytes)),
             }
 
-        # change if we add more weird types
-        assert type_ == "nrl_list_full_size"
-        # NRL full size list
-        f = BytesIO(self.bytes)
-        (num_events,) = struct.unpack("<H", f.read(2))
-        evts = []
-        for _ in range(num_events):
-            d = FullSizeNrlDataPoint()
-            f.readinto(d)
-            evts.append(d)
-        (timestamp,) = struct.unpack("<L", f.read(4))
-        return {"type": type_, "data": {"unix_time": timestamp, "events": evts}}
+        if type_ == "fpga_lm_nrl1":
+            f = BytesIO(self.bytes)
+            (num_events,) = struct.unpack("<H", f.read(2))
+            evts = []
+            for _ in range(num_events):
+                d = NrlDataPoint()
+                f.readinto(d)
+                evts.append(d)
+            (timestamp,) = struct.unpack("<L", f.read(4))
+            return {"type": type_, "data": {"unix_time": timestamp, "events": evts}}
+
+        raise ValueError(f"Unknown debug type {type_}")
 
 
-class FullSizeNrlDataPoint(ctypes.LittleEndianStructure):
+class NrlDataPoint(ctypes.LittleEndianStructure):
     NS_PER_TICK = 25
     _pack_ = 1
     _fields_ = (
@@ -274,4 +278,4 @@ class FullSizeNrlDataPoint(ctypes.LittleEndianStructure):
     )
 
     def to_json(self):
-        return {field[0]: getattr(self, field[0]) for field in self._fields_}
+        return {k: getattr(self, k) for k, *_ in self._fields_}
