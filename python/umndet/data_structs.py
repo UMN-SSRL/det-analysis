@@ -10,22 +10,20 @@ def c_to_k(t):
 
 
 NUM_HG_BINS = 123
-ImpressHistogramArray = NUM_HG_BINS * ctypes.c_uint32
+ImpressHistogramArray = NUM_HG_BINS * ctypes.c_uint16
 
 
 class NominalImpress(ctypes.Structure):
     # do not pad the struct
     _pack_ = 1
     _fields_ = [
-        ("ch", ctypes.c_uint8),
+        ("unix_second", ctypes.c_uint32),
         ("buffer_number", ctypes.c_uint16),
-        ("num_evts", ctypes.c_uint32),
-        ("num_triggers", ctypes.c_uint32),
-        ("dead_time", ctypes.c_uint32),
-        ("anode_current", ctypes.c_uint32),
+        ("num_evts", ctypes.c_uint16),
+        ("num_triggers", ctypes.c_uint16),
+        ("dead_time", ctypes.c_uint16),
+        ("anode_current", ctypes.c_uint16),
         ("histogram", ImpressHistogramArray),
-        ("time_anchor", ctypes.c_uint32),
-        ("missed_pps", ctypes.c_bool),
     ]
 
     def to_json(self):

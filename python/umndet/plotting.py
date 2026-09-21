@@ -15,14 +15,12 @@ def plot_raw_time_slice_spectrogram(
     def from_timestamp(ts):
         return datetime.datetime.fromtimestamp(ts, tz=datetime.UTC)
 
-    recent = from_timestamp(data[0].time_anchor)
-    times = [recent]
-    idx = 1
-    for hd in data[1:]:
-        if hd.time_anchor != 0:
-            recent = from_timestamp(hd.time_anchor)
-        times.append(recent + datetime.timedelta(seconds=((idx % 32) / 32)))
-        idx += 1
+    # recent = from_timestamp(data[0].time_anchor)
+    times: list[datetime.datetime] = []
+    for d in data:
+        dtime = from_timestamp(d.unix_second)
+        dtime += datetime.timedelta(seconds=(d.buffer_number % 32) / 32)
+        times.append(dtime)
 
     # "time bins" are 1 larger than the # of histograms we get
     times.append(times[-1] + datetime.timedelta(seconds=1 / 32))
