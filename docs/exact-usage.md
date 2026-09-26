@@ -5,71 +5,16 @@ Assumes you have the following equipment:
 - RPi CM3+ or other compatible device
 - Radioactive source (for some later steps)
 
-The steps are in `## heading 2` size
+## Build and install [Nebula](https://github.com/UMN-SSRL/Nebula)
+### 📝 Serial numbers can be modified in `/etc/environment` if necessary.
 
-## 1. Flash a microsd with rpi os lite 64 bit using rpi imager
-You can download the RPi imager from its website: [imager](https://www.raspberrypi.com/software/)
-
-## 2. Boot into the Pi and set up the timezone and localization options via `raspi-config`
-**Ensure the ethernet cable is plugged in**
-
-- timezone: chicago
-- keyboard: generic, US layout
-- locale: `EN_US`
-- to pick the locale you need to use space bar, kind of weird but yeah
-
-While you're at it, make a couple more changes in raspi-config:
-- enable the SSH server
-- enable the i2c interface
-
-## 3. Set a static IP address for the Pi using nmtui
-- run `sudo nmtui`
-- hit `Edit a connection`
-- Wired connection 1
-- Edit
-- ipv6: disable
-- ipv4: set to manual
-- addresses: 192.168.2.8/24
-- gateway: 192.168.2.1
-- DNS: 192.168.2.1
-
-test by pinging 1.1.1.1
-should reply with bytes
-if it doesn't work, double check things are configured properly
-
-**when the network is set up, you can connect via SSH so it's easier to copy and paste**
-
-## 4. Install required packages; this will take a few minutes
-```bash
-sudo apt update
-sudo apt upgrade -y
-# It may ask about initramfs or other packages.
-# Pick the option that says "the package maintainer's version"
-sudo apt install git cmake gcc g++ build-essential libboost-thread-dev libusb-1.0-0-dev libgtest-dev libsystemd-dev libgpiod-dev python3-smbus
-```
-
-## 5. Clone and build the umn-detector-code
-```bash
-git clone https://github.com/umn-impish/umn-detector-code.git
-cd umn-detector-code/flight-controller
-mkdir build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j3
-sudo make install
-
-# After make install, run these commands,
-# and restart any other SSH sessions you have open
-sudo udevadm control --reload-rules
-sudo udevadm trigger
-exec $SHELL
-```
-
-## 6. Once the flight utility programs are installed, we need to configure the DS3231 real-time clock to work as a PPS source for testing.
-If you are yousing a real GPS for the PPS, the configuration will be completely different.
+## If necessary: Configure the DS3231 clock as a fake PPS source
+### ⚠️ If you are yousing a real GPS for the PPS, the configuration will be completely different. ⚠️
 
 The RTC data sheet is here: [DS3231 data sheet](https://www.analog.com/media/en/technical-documentation/data-sheets/ds3231.pdf).
 It contains a pinout for the chip if you want to start from scratch.
+
+**⚠️ The strobe output by the DS3231 needs to be [buffered](https://en.wikipedia.org/wiki/Buffer_amplifier) (not shown in photo below).⚠️**
 
 In lab we have it set up on a bread board.
 It is powered from the Pi I/O board,
@@ -128,91 +73,9 @@ Once you run the snippet,
 The multimeter will flash between 0V and 3.3V at about a 1 second period.
 If you use the oscilloscope, be sure to DC couple it.
 
-## 7. Run the program tests
-Go back to `umn-detector-code/flight-controller/build` if you left it.
-Then run `make test` to run some program tests.
-Most of them should pass,
-    except for the `sipm3k.TimeSliceRead`,
-    if everything is configured properly.
-If you don't have a radioactive source near the detector at this point,
-    the `sipm3k.FillListBufferAndRead` test will likely fail.
-If some tests fail, go back and double check everything.
+## Begin data acquisition
+Run `det_start_exact_sci`.
+Files will accumulate in `/SAT/LIVE/DET-SCI`,
+    and will be transferred to the ground station if norm is proprely configured.
 
-## 8. Go to the lab-scripts folder and run some scripts
-For NRL data acquistion,
-    a 1Hz square wave needs to be connected to GPIO 31 on the Pi,
-    and to the GPIO S0 on the Bridgeport board.
-The 1Hz strobe synchronizes the system clock and data.
-
-To get some data, do the following.
-
-**Be sure to put a radioactive source near the detector
-    if you haven't already.**
-
-In one terminal, run the `view_logs` script and monitor it for issues
-```bash
-cd umn-detector-code/lab-scripts/data-collection
-./view_logs.bash
-```
-
-In another terminal, run the scripts to start data acquisition
-```bash
-cd umn-detector-code/lab-scripts/data-collection/exact_specific
-
-# Start relevant programs
-./nrl_init.bash
-
-# This will take data for 10s, you can make it longer if you want
-./start_nrl_list.bash 10
-```
-
-If you see no activity aside from the initialization info when running `view_logs`,
-    the serial numbers might be misconfigured.
-Edit them in `$HOME/detector-config/envars.bash`.
-The available serial numbers get listed in the logs.
-For EM testing,
-    there should only be one connected.
-
-If you see errors in `view_logs`, particularly a `std::out_of_range`, then
-the serial numbers configured in `envars.bash` are probably wrong and you need to
-go in and update them. Quit the programs using `quit.bash`, update the envars,
-and try again.
-
-**After editing the serial numbers, be sure to `source $HOME/detector-config/envars.bash`.**
-
-You should see something along these lines print out in the logs
-```
-Jul 18 14:06:03 raspberrypi det-controller[3820]: Serial numbers available
-Jul 18 14:06:03 raspberrypi det-controller[3820]: serial number: 7A65CD294A344E51202020412B2404FF
-Jul 18 14:06:03 raspberrypi det-controller[3820]: Destructing LibUsb::DeviceList
-Jul 18 14:06:03 raspberrypi det-controller[3820]: udp port is: 61000
-Jul 18 14:06:03 raspberrypi det-controller[3820]: udp port is: 61000
-Jul 18 14:06:03 raspberrypi det-controller[3820]: udp port is: 61001
-Jul 18 14:06:03 raspberrypi det-controller[3820]: Constructing LibUsb::Context
-Jul 18 14:06:03 raspberrypi det-controller[3820]: Constructing LibUsb::DeviceHandle from existing handle
-Jul 18 14:06:03 raspberrypi det-controller[3820]: Destructing LibUsb::Context
-Jul 18 14:06:03 raspberrypi det-controller[3820]: USB issue: Existing handle is null (not connected?)
-Jul 18 14:06:03 raspberrypi det-controller[3820]: udp port is: 61008
-Jul 18 14:06:03 raspberrypi det-controller[3820]: udp port is: 61009
-Jul 18 14:06:03 raspberrypi det-controller[3820]: X-123 disconnected; using 1024 bins as default
-Jul 18 14:06:13 raspberrypi det-controller[3820]: 1 is full
-Jul 18 14:06:17 raspberrypi det-controller[3820]: 0 is full
-Jul 18 14:06:21 raspberrypi det-controller[3820]: 1 is full
-Jul 18 14:06:24 raspberrypi det-controller[3820]: 0 is full
-Jul 18 14:06:28 raspberrypi det-controller[3820]: 1 is full
-Jul 18 14:06:31 raspberrypi det-controller[3820]: 0 is full
-Jul 18 14:06:35 raspberrypi det-controller[3820]: 1 is full
-Jul 18 14:06:38 raspberrypi det-controller[3820]: 0 is full
-Jul 18 14:06:42 raspberrypi det-controller[3820]: 1 is full
-Jul 18 14:06:45 raspberrypi det-controller[3820]: 0 is full
-Jul 18 14:06:48 raspberrypi det-controller[3820]: 1 is full
-Jul 18 14:06:54 raspberrypi det-controller[3820]: 0 is full
-Jul 18 14:07:00 raspberrypi det-controller[3820]: 1 is full
-Jul 18 14:07:05 raspberrypi det-controller[3820]: Destructing LibUsb::DeviceHandle
-Jul 18 14:07:05 raspberrypi det-controller[3820]: Destructing LibUsb::Context
-Jul 18 14:07:05 raspberrypi det-controller[3820]: detector sleep
-```
-
-The data is output into the `live` folder and after a time delay, it is gzipped and moved to the `completed` folder.
-
-You can copy the files to your computer using `scp`.
+## Data Analysis -- see `python/examples`.

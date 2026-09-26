@@ -85,27 +85,8 @@ source .venv/bin/activate
 jupyter notebook
 ```
 
-### Scripts to decode data into JSON
-There are a few scripts which are installed from
-    `umn-detector-code/python`.
-You can see their names at the bottom of
-    `umn-detector-code/python/pyproject.toml`.
-The scripts call code functions within the Python package.
-
-To decode, for example, health data:
-```bash
-decode-impress-health health_file1.bin.gz health_file2.bin.gz impress_health.json
-```
-
-This will decode the health data into a JSON file,
-    which you can read into Jupyter.
-
-Similar scripts exist for other data types.
-The script names are in `pyproject.toml`,
-    at the bottom.
-
 ### Working with `.bin.gz` files directly
-You can also open the `.bin.gz` files in Python directly.
+You can open the `.bin.gz` files in Python directly.
 Here is an example snippet of doing just that.
 ```py
 from umndet.common import helpers
@@ -134,3 +115,22 @@ pprint.pprint(health_packets[0].c1.to_json())
 #  'sipm_target_voltage': {'unit': 'volt', 'value': 35.38},
 #  'sipm_temp': {'unit': 'Kelvin', 'value': 295.18}}
 ```
+
+### Scripts to decode data into JSON
+There are a few scripts which are installed from
+    `umn-detector-code/python`.
+You can see their names at the bottom of
+    `umn-detector-code/python/pyproject.toml`.
+The scripts call code functions within the Python package.
+
+To decode, for example, health data:
+```bash
+decode-impress-health health_file1.bin.gz health_file2.bin.gz impress_health.json
+```
+
+This will decode the health data into a JSON file,
+    which you can read into Jupyter.
+
+Similar scripts exist for other data types.
+The script names are in `pyproject.toml`,
+    at the bottom.
