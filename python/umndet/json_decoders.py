@@ -1,22 +1,25 @@
 import argparse
-import datetime as dt
-import json
-import gzip
-import numpy as np
 import datetime
-from umndet.common import helpers as hp
-from umndet.common import impress_exact_structs as ies
-import umndet.common.constants as umncon
+import datetime as dt
+import gzip
+import json
+import json.encoder
+from typing import cast
+
+import numpy as np
+
+from . import data_structs as ds
+from . import helpers as hp
 
 
 # Monkeypatch JSON to output only 2 decmials
 # https://stackoverflow.com/a/69056325
 class RoundingFloat(float):
-    __repr__ = staticmethod(lambda x: format(x, ".2f"))
+    __repr__ = staticmethod(lambda x: format(x, ".2f"))  # pyright: ignore[reportAssignmentType]
 
 
-json.encoder.c_make_encoder = None
-json.encoder.float = RoundingFloat
+json.encoder.c_make_encoder = None  # pyright: ignore[reportAttributeAccessIssue]
+json.encoder.float = RoundingFloat  # pyright: ignore[reportAttributeAccessIssue]
 
 
 def decode_health():
@@ -78,15 +81,15 @@ def decode_x123_sci():
         json.dump(json_out, f, indent=1)
 
 
-def decode_hafx_debug_hist():
-    p = argparse.ArgumentParser(description="Decode HaFX debug histograms to JSON")
+def decode_impress_debug_hist():
+    p = argparse.ArgumentParser(description="Decode IMPRESS debug histograms to JSON")
     p.add_argument("files", nargs="+", help="debug histogram files to decode to JSON")
     p.add_argument("output_fn", help="output file name to write JSON")
     args = p.parse_args()
 
     data = []
     for fn in args.files:
-        data += hp.read_hafx_debug(fn, gzip.open)
+        data += hp.read_bridgeport_debug(fn, gzip.open)
 
     decoded = [d.decode() for d in data]
     if any(d["type"] != "histogram" for d in decoded):
@@ -100,47 +103,7 @@ def decode_hafx_debug_hist():
         json.dump(out, f, indent=1)
 
 
-def get_proper_timedelta(file_name):
-    """
-    Rebinned science data will have different time deltas between events.
-    This is because if we sum along the time axis, the counts in the
-    spectrogram can be considered to be bounded by wider time edges.
-
-    Make this a function so that we can update it if we change the rebinning scheme down the line.
-    """
-    # File name format is: IDENT_DATE_#.extension
-    identifier, date_str, _ = file_name.split("_")
-    date = dt.datetime.strptime(date_str, umncon.DATE_FMT)
-
-    slice_width = dt.timedelta(seconds=1 / 32)
-
-    if "time" in identifier:
-        # Add more revisions as appropriate
-        if date >= umncon.FIRST_REVISION:
-            return umncon.FIRST_NUM_TIMES_REBIN * slice_width
-
-    return slice_width
-
-
-def get_data_format(fn: str) -> str:
-    """
-    Depending on the file naming convention used by the rebinner,
-    we can either be dealing with:
-        - "raw" aka full-resolution data
-        - rebinned across time
-        - rebinned across energy
-        - rebinneda cross time and energy
-    """
-    possibilities = ("time+energy", "time", "energy")
-    for p in possibilities:
-        if fn.startswith(p):
-            return p
-
-    # No rebinning has happened; return something useful
-    return "full_resolution"
-
-
-def decode_hafx_sci():
+def decode_impress_sci():
     """
     Decode science data from binary structures to JSON.
     Assumes:
@@ -150,23 +113,21 @@ def decode_hafx_sci():
     Note that the timestamps correspond to the "left" edges of the
     times where counts are recorded.
     """
-    p = argparse.ArgumentParser(description="Decode HaFX science files to JSON")
+    p = argparse.ArgumentParser(description="Decode IMPRESS science files to JSON")
     p.add_argument("files", nargs="+", help="files to decode to JSON")
     p.add_argument("output_fn", help="output file name to write JSON")
     args = p.parse_args()
 
-    hafx_data = []
+    impress_data = []
     time_deltas = []
-    data_type = []
     for fn in args.files:
-        hafx_data += (cur_data := hp.read_hafx_sci(fn, gzip.open))
+        impress_data += (cur_data := hp.read_impress_sci(fn, gzip.open))
         # Give as many timedeltas and data formats
         # as there are data points per file,
         # so that we can easily align them later
-        time_deltas += [get_proper_timedelta(fn)] * len(cur_data)
-        data_type += [get_data_format(fn)] * len(cur_data)
+        time_deltas += [1 / 32] * len(cur_data)
 
-    jsonified = [hd.to_json() for hd in hafx_data]
+    jsonified = [hd.to_json() for hd in impress_data]
 
     # Default value: start of UNIX epoch
     utc_time = dt.datetime.fromtimestamp(0, dt.UTC)
@@ -181,8 +142,6 @@ def decode_hafx_sci():
             "value": (utc_time + (frame_num % 32) * step).isoformat() + "Z",
             "unit": "N/A",
         }
-        type_ = data_type[i]
-        json_dat["datatype"] = {"value": type_, "unit": "N/A"}
 
     jsonified.sort(key=lambda e: e["timestamp"]["value"])
     collapsed = collapse_json(jsonified)
@@ -190,9 +149,9 @@ def decode_hafx_sci():
         json.dump(collapsed, f)
 
 
-def collapse_json(data: list[dict[str, object]]):
+def collapse_json(data: list[dict[str, object]]) -> dict[str, object]:
     collapse_keys = tuple(data[0].keys())
-    ret = dict()
+    ret = {}
 
     for datum in data:
         for k in collapse_keys:
@@ -208,10 +167,10 @@ def collapse_json(data: list[dict[str, object]]):
     return ret
 
 
-def collapse_health(dat: list[dict[str, object]]) -> list[dict[str, object]]:
-    detectors = ("c1", "m1", "m5", "x1", "x123")
-    ret = dict()
+def collapse_health(dat: list[dict[str, dict | object]]) -> dict[str, list | dict]:
+    ret = {}
 
+    detectors = ("c1", "m1", "m5", "x1", "x123")
     for detector in detectors:
         ret[detector] = collapse_json([d[detector] for d in dat])
 
@@ -230,7 +189,7 @@ def decode_exact_sci():
     p.add_argument("output_fn", help="output file name to write JSON")
     args = p.parse_args()
 
-    jsonified = list()
+    jsonified = []
     for fn in args.files:
         cur_buffers = hp.read_nrl_list(fn, gzip.open)
         for buffer in cur_buffers:
@@ -248,15 +207,15 @@ def decode_exact_sci():
         f.write(bytes_)
 
 
-def jsonify_exact_buffer(buffer: dict[str, object]) -> dict[str, object]:
+def jsonify_exact_buffer(buffer: dict[str, int | list[ds.NrlDataPoint]]) -> list[dict[str, object]]:
     """Take a list of EXACT NRL buffers which have been read into
     a dict format of {'timestamp': timestamp, 'buffers': [buffers]}
     and "jsonify" them into a list of JSON objects
     represented as dictionaries.
     """
-    all_events, rel_times = list(), list()
+    all_events, rel_times = [], []
     last_pps_rel_time = None
-    for i, e in enumerate(buffer["events"]):
+    for e in cast(list[ds.NrlDataPoint], buffer["events"]):
         all_events.append(e)
         rel_times.append(e.relative_timestamp)
 
@@ -269,7 +228,7 @@ def jsonify_exact_buffer(buffer: dict[str, object]) -> dict[str, object]:
     # The last PPS event is assumed to be aligned with the
     # absolute time saved immediately after the buffer readout.
     # So, we save the values for calibration in the next step.
-    time_after = buffer["unix_time"]
+    time_after = cast(int, buffer["unix_time"])
     anchor = datetime.datetime.fromtimestamp(time_after, datetime.UTC)
 
     all_events = [events.to_json() for events in all_events]
@@ -280,7 +239,7 @@ def jsonify_exact_buffer(buffer: dict[str, object]) -> dict[str, object]:
         del evt["relative_timestamp"]
 
         # Datetime can't format nanoseconds natively, so add it manually after
-        ns_delta = (rel_time - last_pps_rel_time) * ies.FullSizeNrlDataPoint.NS_PER_TICK
+        ns_delta = (rel_time - last_pps_rel_time) * ds.NrlDataPoint.NS_PER_TICK
         delta = datetime.timedelta(microseconds=int(ns_delta / 1e3))
 
         abs_time = (anchor + delta).strftime("%Y-%j-%H-%M-%S")
