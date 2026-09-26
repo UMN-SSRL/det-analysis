@@ -41,9 +41,4 @@ To collect IMPRESS data, run `det_start_impress_sci`.
 Files will accumulate in `/SAT/LIVE/DET-SCI`,
     and will be transferred to the ground station if norm is proprely configured.
 
-## Data Analysis
-### Nominal science
-**TODO**
-
-### Debug acquisitions
-**TODO**
+## Data Analysis -- see `python/examples`
