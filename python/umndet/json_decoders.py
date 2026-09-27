@@ -207,7 +207,9 @@ def decode_exact_sci():
         f.write(bytes_)
 
 
-def jsonify_exact_buffer(buffer: dict[str, int | list[ds.NrlDataPoint]]) -> list[dict[str, object]]:
+def jsonify_exact_buffer(
+    buffer: dict[str, int | list[ds.NrlDataPoint]],
+) -> list[dict[str, object]]:
     """Take a list of EXACT NRL buffers which have been read into
     a dict format of {'timestamp': timestamp, 'buffers': [buffers]}
     and "jsonify" them into a list of JSON objects
@@ -216,7 +218,7 @@ def jsonify_exact_buffer(buffer: dict[str, int | list[ds.NrlDataPoint]]) -> list
     all_events, rel_times = [], []
     last_pps_rel_time = None
     for e in cast(list[ds.NrlDataPoint], buffer["events"]):
-        all_events.append(e)
+        all_events.append(e.to_json())
         rel_times.append(e.relative_timestamp)
 
         if not e.was_pps:
@@ -229,22 +231,17 @@ def jsonify_exact_buffer(buffer: dict[str, int | list[ds.NrlDataPoint]]) -> list
     # absolute time saved immediately after the buffer readout.
     # So, we save the values for calibration in the next step.
     time_after = cast(int, buffer["unix_time"])
-    anchor = datetime.datetime.fromtimestamp(time_after, datetime.UTC)
-
-    all_events = [events.to_json() for events in all_events]
 
     # Put the events into a structure with absolute times
     for evt, rel_time in zip(all_events, rel_times):
         # Remove the relative time key; we will replace it
         del evt["relative_timestamp"]
+        evt["anchor_time"] = time_after
 
-        # Datetime can't format nanoseconds natively, so add it manually after
-        ns_delta = (rel_time - last_pps_rel_time) * ds.NrlDataPoint.NS_PER_TICK
-        delta = datetime.timedelta(microseconds=int(ns_delta / 1e3))
-
-        abs_time = (anchor + delta).strftime("%Y-%j-%H-%M-%S")
-        abs_time += f"_{int(ns_delta % 1e9)}"
-
-        evt["absolute_timestamp"] = abs_time
+        # Save the time delta (in nanoseconds) from the last PPS in the buffer
+        # (aka the anchor time) to the current event
+        evt["anchor_ns_delta"] = int(
+            (rel_time - last_pps_rel_time) * ds.NrlDataPoint.NS_PER_TICK
+        )
 
     return all_events
