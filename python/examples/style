@@ -9,7 +9,7 @@ axes.titlesize      : 16
 axes.labelsize      : 12
 axes.titlepad       : 12
 
-figure.figsize      : 10, 8 
+figure.figsize      : 8, 6 
 figure.titlesize    : 16
 savefig.facecolor   : white
 
