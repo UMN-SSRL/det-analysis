@@ -1,5 +1,4 @@
 import argparse
-import datetime
 import datetime as dt
 import gzip
 import json

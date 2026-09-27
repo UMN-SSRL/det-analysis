@@ -13,7 +13,7 @@ NUM_HG_BINS = 123
 ImpressHistogramArray = NUM_HG_BINS * ctypes.c_uint16
 
 
-class NominalImpress(ctypes.Structure):
+class NominalImpress(ctypes.LittleEndianStructure):
     # do not pad the struct
     _pack_ = 1
     _fields_ = [
@@ -51,7 +51,7 @@ class NominalImpress(ctypes.Structure):
         }
 
 
-class BridgeportHealth(ctypes.Structure):
+class BridgeportHealth(ctypes.LittleEndianStructure):
     # no struct padding
     _pack_ = 1
     _fields_ = [
@@ -96,7 +96,7 @@ class BridgeportHealth(ctypes.Structure):
         }
 
 
-class X123Health(ctypes.Structure):
+class X123Health(ctypes.LittleEndianStructure):
     _fields_ = [
         # 1 degC / tick
         ("board_temp", ctypes.c_int8),
@@ -133,9 +133,22 @@ class X123Health(ctypes.Structure):
         }
 
 
-class DetectorHealth(ctypes.Structure):
+class SmallsatHeader(ctypes.LittleEndianStructure):
     _pack_ = 1
     _fields_ = [
+        ("length", ctypes.c_uint16),
+        ("destination_port", ctypes.c_uint16),
+        ("source_port", ctypes.c_uint16),
+        ("status", ctypes.c_uint8),
+        ("sequence_number", ctypes.c_uint8),
+        ("unix_time", ctypes.c_uint32),
+    ]
+
+
+class DetectorHealth(ctypes.LittleEndianStructure):
+    _pack_ = 1
+    _fields_ = [
+        ("header", SmallsatHeader),
         ("timestamp", ctypes.c_uint32),
         ("c1", BridgeportHealth),
         ("m1", BridgeportHealth),
