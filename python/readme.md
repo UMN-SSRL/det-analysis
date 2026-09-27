@@ -1,7 +1,3 @@
-# Python code for IMPRESS+EXACT+IMPISH
-
-## For setup, see `docs/python-setup.md`
-
 ## How to use
 ### Import what you want in Python, e.g.: `from umndet import data_structs as ds`
 
